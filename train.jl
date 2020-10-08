@@ -6,11 +6,7 @@ using Dates: now
 using Distributions
 
 
-function loss(model, γ, states_t, states_t1, actions_t, rewards_t, unfinished_t1, sz)
-    
-    # calculate y
-    q_max_t1 = view(findmax(model(states_t1), dims=1)[1], 1, :)
-    y = rewards_t .+ γ .* unfinished_t1 .* q_max_t1
+function loss(model, y, states_t, actions_t, sz)
 
     # calculate predicted y
     q_vals = model(states_t)
@@ -20,9 +16,7 @@ function loss(model, γ, states_t, states_t1, actions_t, rewards_t, unfinished_t
 
     # calculate the loss
     q_loss = (y .- ŷ) .^ 2
-    l = mean(q_loss)
-
-    return l
+    return mean(q_loss)
 end
 
 function train()
@@ -97,9 +91,13 @@ function train()
                 batch_rewards_t = rewards_t[idxs]
                 batch_unfinished_t1 = unfinished_t1[idxs]
 
+                # calculate the predicted q values
+                q_max_t1 = view(findmax(model(batch_states_t1), dims=1)[1], 1, :)
+                y = batch_rewards_t .+ γ .* batch_unfinished_t1 .* q_max_t1
+
                 # update
                 ps = Flux.params(model)
-                grad = gradient(() -> loss(model, γ, batch_states_t, batch_states_t1, batch_actions_t, batch_rewards_t, batch_unfinished_t1, batch_size), ps)
+                grad = gradient(() -> loss(model, y, batch_states_t, batch_actions_t, batch_size), ps)
                 Flux.update!(opt, ps, grad)
 
             end
@@ -119,7 +117,9 @@ function train()
             end
 
         end
-        println(r)
+        if n > 1000
+            println(r)
+        end
 
     end
 end
